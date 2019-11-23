@@ -20,7 +20,7 @@ BoidCollection::BoidCollection(void)
 {
     UniformDistribution d_pos;
     UniformDistribution d_vel(0.5f, s_max_vel / 2.f);
-    reset(10, d_pos, d_vel);
+    reset(1000, d_pos, d_vel);
 }
 
 void BoidCollection::reset(size_t new_boid_count, Distribution& init_pos,

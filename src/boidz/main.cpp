@@ -58,6 +58,38 @@ void draw(const BoidCollection& boids, const WindowProps& props)
     glEnd();
 }
 
+void draw_debug_layout(const WindowProps& props)
+{
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, props.width, props.height, 0, 100, -100);
+
+    glBegin(GL_LINE_STRIP);
+    // config panel
+    glColor3f(1.f, 0.f, 0.f);
+    glVertex2f(1 + props.config_panel_upper_left_x, props.config_panel_upper_left_y);
+    glVertex2f(props.config_panel_upper_left_x + props.config_panel_width,
+               props.config_panel_upper_left_y);
+    glVertex2f(props.config_panel_upper_left_x + props.config_panel_width,
+               props.config_panel_upper_left_y + props.config_panel_height - 1);
+    glVertex2f(1 + props.config_panel_upper_left_x,
+               props.config_panel_upper_left_y + props.config_panel_height - 1);
+    glVertex2f(1 + props.config_panel_upper_left_x, props.config_panel_upper_left_y);
+    glEnd();
+
+    glBegin(GL_LINE_STRIP);
+    glColor3f(0.f, 0.f, 1.f);
+    glVertex2f(1 + props.sim_region_upper_left_x, props.sim_region_upper_left_y);
+    glVertex2f(props.sim_region_upper_left_x + props.sim_region_width,
+               props.sim_region_upper_left_y);
+    glVertex2f(props.sim_region_upper_left_x + props.sim_region_width,
+               props.sim_region_upper_left_y + props.config_panel_height - 1);
+    glVertex2f(1 + props.sim_region_upper_left_x,
+               props.sim_region_upper_left_y + props.config_panel_height - 1);
+    glVertex2f(1 + props.sim_region_upper_left_x, props.sim_region_upper_left_y);
+    glEnd();
+}
+
 struct BoidSim {
     BoidCollection boids;
     QuadTree grid;
@@ -107,9 +139,10 @@ int main(int, char**)
     // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
 
+    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+
     // Create window with graphics context
-    GLFWwindow* window =
-        glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "WeBoids", NULL, NULL);
     if (window == NULL) return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);  // Enable vsync
@@ -150,6 +183,13 @@ int main(int, char**)
 
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    ImGui::GetStyle().WindowRounding = 0.0f;
+    ImGui::GetStyle().ChildRounding = 0.0f;
+    ImGui::GetStyle().FrameRounding = 0.0f;
+    ImGui::GetStyle().GrabRounding = 0.0f;
+    ImGui::GetStyle().PopupRounding = 0.0f;
+    ImGui::GetStyle().ScrollbarRounding = 0.0f;
+
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -168,29 +208,21 @@ int main(int, char**)
         ImGui::NewFrame();
 
         {
-            static float f = 0.0f;
-            static int counter = 0;
+            ImGui::SetNextWindowPos(
+                ImVec2(props.config_panel_upper_left_x, props.config_panel_upper_left_y),
+                ImGuiSetCond_Always);
 
-            ImGui::Begin("Hello, world!");  // Create a window called "Hello, world!" and
-                                            // append into it.
+            ImGui::SetNextWindowSize(
+                ImVec2(props.config_panel_width, props.config_panel_height),
+                ImGuiSetCond_Always);
 
-            ImGui::Text("This is some useful text.");  // Display some text (you can use a
-                                                       // format strings too)
+            ImGui::Begin(
+                "weboids", 0,
+                ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove |
+                    ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
 
-            ImGui::SliderFloat("float", &f, 0.0f,
-                               1.0f);  // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3(
-                "clear color",
-                (float*)&clear_color);  // Edit 3 floats representing a color
-
-            if (ImGui::Button("Button"))  // Buttons return true when clicked (most
-                                          // widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                        1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::Text("This is some useful text.");
             ImGui::End();
         }
 
@@ -205,6 +237,7 @@ int main(int, char**)
         glClear(GL_COLOR_BUFFER_BIT);
         props.update(display_w, display_h);
         tick(props);
+        draw_debug_layout(props);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwMakeContextCurrent(window);
