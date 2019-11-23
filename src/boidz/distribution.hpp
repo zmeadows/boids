@@ -25,7 +25,7 @@ public:
     UniformDistribution(float low, float high) : Distribution(), m_dist(low, high) {}
 
     UniformDistribution(void)
-        : Distribution(), m_dist(epsilon, boid_coordinates::span - epsilon)
+        : Distribution(), m_dist(epsilon, WindowProps::coordinate_span - epsilon)
     {
     }
 

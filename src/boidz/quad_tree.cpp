@@ -3,8 +3,9 @@
 // @OPTIMIZE: there is a bit hack for doing this in ~1 cpu cycle
 int QuadTree::position_to_node_index(V2 pos) const
 {
-    assert(boid_coordinates::is_valid(pos));
-    const float node_span = boid_coordinates::span / static_cast<float>(m_nodes_per_axis);
+    assert(WindowProps::is_valid(pos));
+    const float node_span =
+        WindowProps::coordinate_span / static_cast<float>(m_nodes_per_axis);
     const int node_x = static_cast<int>(std::floor(pos.x / node_span));
     const int node_y = static_cast<int>(std::floor(pos.y / node_span));
     const int node_index = m_nodes_per_axis * node_y + node_x;

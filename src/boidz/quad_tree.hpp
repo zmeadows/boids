@@ -18,7 +18,7 @@ struct PseudoBoid {
     PseudoBoid(V2 _pos, V2 _vel, float _weight) : pos(_pos), vel(_vel), weight(_weight)
     {
         // TODO: deal with this error without failing
-        assert(boid_coordinates::is_valid(pos));
+        assert(WindowProps::is_valid(pos));
     }
 };
 
