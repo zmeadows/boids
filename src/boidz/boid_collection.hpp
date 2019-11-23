@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "distribution.hpp"
@@ -9,13 +10,24 @@
 class QuadTree;
 
 struct RuleParameters {
-    float center_of_mass;
-    float densitiy;
-    float confine;
-    float avg_vel;
-    float gravity;
+    struct {
+        float com;
+        float density;
+        float confine;
+        float avg_vel;
+        float gravity;
+    } value;
 
-    RuleParameters(void);
+    struct {
+        bool com;
+        bool density;
+        bool confine;
+        bool avg_vel;
+        bool gravity;
+    } enabled;
+
+    float max_force = 1000.f;
+    float max_vel = 250.f;
 };
 
 class BoidCollection {
@@ -27,9 +39,6 @@ class BoidCollection {
     std::vector<V2> m_delta_center_of_mass;
 
     size_t m_count = 0;
-
-    static const float s_max_vel;
-    static const float s_max_force;
 
 public:
     BoidCollection(void);

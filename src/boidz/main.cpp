@@ -8,6 +8,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_internal.h"
 
 // About OpenGL function loaders: modern OpenGL doesn't have a standard header file and
 // requires individual function pointers to be loaded manually. Helper libraries are often
@@ -95,6 +96,7 @@ struct BoidSim {
     QuadTree grid;
     RuleParameters params;
 
+    // TODO: pass in frame time
     void tick(const WindowProps& props)
     {
         boids.update(1.f / 60.f, params, grid);
@@ -222,7 +224,29 @@ int main(int, char**)
                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
 
-            ImGui::Text("This is some useful text.");
+            RuleParameters& params = g_sim.params;
+
+            ImGui::Checkbox("##CoM_Checkbox", &params.enabled.com);
+            ImGui::SameLine();
+            ImGui::InputFloat("Center Of Mass", &params.value.com, 0.01f, 1.0f, "%.8f");
+
+            ImGui::Checkbox("##Density_Checkbox", &params.enabled.density);
+            ImGui::SameLine();
+            ImGui::InputFloat("Density", &params.value.density, 0.01f, 1.0f, "%.8f");
+
+            ImGui::Checkbox("##Confine_Checkbox", &params.enabled.confine);
+            ImGui::SameLine();
+            ImGui::InputFloat("Confine", &params.value.confine, 0.01f, 1.0f, "%.8f");
+
+            ImGui::Checkbox("##AvgVel_Checkbox", &params.enabled.avg_vel);
+            ImGui::SameLine();
+            ImGui::InputFloat("Avg. Velocity", &params.value.avg_vel, 0.01f, 1.0f,
+                              "%.8f");
+
+            ImGui::Checkbox("##Gravity_Checkbox", &params.enabled.gravity);
+            ImGui::SameLine();
+            ImGui::InputFloat("Gravity", &params.value.gravity, 0.01f, 1.0f, "%.8f");
+
             ImGui::End();
         }
 

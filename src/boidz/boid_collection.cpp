@@ -2,14 +2,6 @@
 
 static constexpr float wrap_real(float x, float m) { return x - m * std::floor(x / m); }
 
-RuleParameters::RuleParameters(void)
-    : center_of_mass(18.5f), densitiy(100.f), confine(1.f), avg_vel(1.5f), gravity(0.1f)
-{
-}
-
-const float BoidCollection::s_max_vel = 50.f;
-const float BoidCollection::s_max_force = 100.f;
-
 BoidCollection::BoidCollection(size_t new_boid_count, Distribution& init_pos,
                                Distribution& init_vel)
 {
@@ -19,7 +11,7 @@ BoidCollection::BoidCollection(size_t new_boid_count, Distribution& init_pos,
 BoidCollection::BoidCollection(void)
 {
     UniformDistribution d_pos;
-    UniformDistribution d_vel(0.5f, s_max_vel / 2.f);
+    UniformDistribution d_vel(0.5f, 100.f / 2.f);
     reset(1000, d_pos, d_vel);
 }
 
@@ -78,15 +70,22 @@ void BoidCollection::update(float dt, const RuleParameters& params, QuadTree& gr
             }
         }
 
-        // TODO: record minimum boid separation after each update,
-        // so that we can reduce time step at critical points?
         if (weight_sum > 0.f) {
             const float inverted_weight_sum = 1.f / weight_sum;
             const V2 avg_vel = pos_sum * inverted_weight_sum;
             const V2 avg_pos = vel_sum * inverted_weight_sum;
-            m_delta_avg_vel[id] = params.avg_vel * avg_vel;
-            m_delta_density[id] = params.densitiy * dens_accum;
-            m_delta_center_of_mass[id] = params.center_of_mass * (avg_pos - pos);
+
+            if (params.enabled.avg_vel) {
+                m_delta_avg_vel[id] = params.value.avg_vel * avg_vel;
+            }
+
+            if (params.enabled.density) {
+                m_delta_density[id] = params.value.density * dens_accum;
+            }
+
+            if (params.enabled.com) {
+                m_delta_center_of_mass[id] = params.value.com * (avg_pos - pos);
+            }
         }
         else {
             m_delta_avg_vel[id] = V2::null();
@@ -94,35 +93,47 @@ void BoidCollection::update(float dt, const RuleParameters& params, QuadTree& gr
             m_delta_center_of_mass[id] = V2::null();
         }
 
-        // @OPTIMIZE: abs might not be needed, if we're sure all position are
-        // already confined?
-        const float dx1 = std::max((float)1e-6, std::abs(pos.x));
-        const float dx2 = std::max((float)1e-6, std::abs(pos.x - 256.f));
-        const float dy1 = std::max((float)1e-6, std::abs(pos.y));
-        const float dy2 = std::max((float)1e-6, std::abs(pos.y - 256.f));
+        if (params.enabled.confine) {
+            // @FIXME: Use smaller delta time increments when close to edge
+            const float dx1 = std::max((float)1e-6, std::abs(pos.x));
+            const float dx2 = std::max((float)1e-6, std::abs(pos.x - 256.f));
+            const float dy1 = std::max((float)1e-6, std::abs(pos.y));
+            const float dy2 = std::max((float)1e-6, std::abs(pos.y - 256.f));
 
-        const float confine_x = 1.f / (params.confine * std::pow(dx1, 2.f)) -
-                                1.f / (params.confine * std::pow(dx2, 2.f));
-        const float confine_y = 1.f / (params.confine * std::pow(dy1, 2.f)) -
-                                1.f / (params.confine * std::pow(dy2, 2.f));
+            const float cp = params.value.confine;
 
-        m_delta_confine[id] = {confine_x, confine_y};
+            const float confine_x =
+                1.f / (cp * std::pow(dx1, 2.f)) - 1.f / (cp * std::pow(dx2, 2.f));
+            const float confine_y =
+                1.f / (cp * std::pow(dy1, 2.f)) - 1.f / (cp * std::pow(dy2, 2.f));
+
+            m_delta_confine[id] = {confine_x, confine_y};
+        }
     }
 
     for (size_t id = 0; id < m_count; id++) {
-        V2& vel = m_vel[id];
-        V2 dv = m_delta_avg_vel[id] + m_delta_confine[id] + m_delta_density[id] +
-                m_delta_center_of_mass[id];
+        V2 dv = V2::null();
 
+        // apply only the rules that have been turned on
+        if (params.enabled.avg_vel) dv += m_delta_avg_vel[id];
+        if (params.enabled.confine) dv += m_delta_confine[id];
+        if (params.enabled.density) dv += m_delta_density[id];
+        if (params.enabled.com) dv += m_delta_center_of_mass[id];
+        if (params.enabled.gravity) dv.y -= params.value.gravity * dt;
+
+        // clamp the force vector magnitude to the user-specified maximum force.
         const float dv_mag = dv.magnitude();
-        if (dv_mag > s_max_force) {
-            dv *= s_max_force / dv_mag;
+        if (dv_mag > params.max_force) {
+            dv *= params.max_force / dv_mag;
         }
 
-        vel = clamp(vel, s_max_vel);
+        V2& vel = m_vel[id];
+        vel = clamp(vel, params.max_vel);
 
         V2& pos = m_pos[id];
+
         // safety wrapping, shouldn't occur often, ideally ever
+        // @TODO: log this when it happens.
         pos.x = wrap_real(pos.x + dt * vel.x, 256.f);
         pos.y = wrap_real(pos.y + dt * vel.y, 256.f);
     }
