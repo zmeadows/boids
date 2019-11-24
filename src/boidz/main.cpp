@@ -42,52 +42,55 @@
 #include "quad_tree.hpp"
 #include "v2.hpp"
 
-void draw(const BoidCollection& boids, const WindowProps& props)
+void draw(const BoidCollection& boids)
 {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(0, props.width, props.height, 0, 100, -100);
+    // TODO: use transform here instead of transforming coordinates ourself?
+    glOrtho(0, WinProps::window_width(), WinProps::window_height(), 0, 100, -100);
 
     const std::vector<V2>& positions = boids.positions();
 
     glBegin(GL_POINTS);
     for (const V2& pos : positions) {
-        const V2 wpos = props.to_window_coordinates(pos);
+        const V2 wpos = WinProps::boid_to_window_coordinates(pos);
         glColor3f(1.f, 1.f, 1.f);
         glVertex2f(wpos.x, wpos.y);
     }
     glEnd();
 }
 
-void draw_debug_layout(const WindowProps& props)
+void draw_debug_layout(void)
 {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(0, props.width, props.height, 0, 100, -100);
+    glOrtho(0, WinProps::window_width(), WinProps::window_height(), 0, 100, -100);
 
     glBegin(GL_LINE_STRIP);
+
     // config panel
     glColor3f(1.f, 0.f, 0.f);
-    glVertex2f(1 + props.config_panel_upper_left_x, props.config_panel_upper_left_y);
-    glVertex2f(props.config_panel_upper_left_x + props.config_panel_width,
-               props.config_panel_upper_left_y);
-    glVertex2f(props.config_panel_upper_left_x + props.config_panel_width,
-               props.config_panel_upper_left_y + props.config_panel_height - 1);
-    glVertex2f(1 + props.config_panel_upper_left_x,
-               props.config_panel_upper_left_y + props.config_panel_height - 1);
-    glVertex2f(1 + props.config_panel_upper_left_x, props.config_panel_upper_left_y);
+    glVertex2f(1 + WinProps::left_panel_upper_left_x(), WinProps::left_panel_upper_left_y());
+    glVertex2f(WinProps::left_panel_upper_left_x() + WinProps::left_panel_width(),
+               WinProps::left_panel_upper_left_y());
+    glVertex2f(WinProps::left_panel_upper_left_x() + WinProps::left_panel_width(),
+               WinProps::left_panel_upper_left_y() + WinProps::left_panel_height() - 1);
+    glVertex2f(1 + WinProps::left_panel_upper_left_x(),
+               WinProps::left_panel_upper_left_y() + WinProps::left_panel_height() - 1);
+    glVertex2f(1 + WinProps::left_panel_upper_left_x(), WinProps::left_panel_upper_left_y());
     glEnd();
 
+    // debug panel
     glBegin(GL_LINE_STRIP);
     glColor3f(0.f, 0.f, 1.f);
-    glVertex2f(1 + props.sim_region_upper_left_x, props.sim_region_upper_left_y);
-    glVertex2f(props.sim_region_upper_left_x + props.sim_region_width,
-               props.sim_region_upper_left_y);
-    glVertex2f(props.sim_region_upper_left_x + props.sim_region_width,
-               props.sim_region_upper_left_y + props.config_panel_height - 1);
-    glVertex2f(1 + props.sim_region_upper_left_x,
-               props.sim_region_upper_left_y + props.config_panel_height - 1);
-    glVertex2f(1 + props.sim_region_upper_left_x, props.sim_region_upper_left_y);
+    glVertex2f(1 + WinProps::sim_region_upper_left_x(), WinProps::sim_region_upper_left_y());
+    glVertex2f(WinProps::sim_region_upper_left_x() + WinProps::sim_region_width(),
+               WinProps::sim_region_upper_left_y());
+    glVertex2f(WinProps::sim_region_upper_left_x() + WinProps::sim_region_width(),
+               WinProps::sim_region_upper_left_y() + WinProps::left_panel_height() - 1);
+    glVertex2f(1 + WinProps::sim_region_upper_left_x(),
+               WinProps::sim_region_upper_left_y() + WinProps::left_panel_height() - 1);
+    glVertex2f(1 + WinProps::sim_region_upper_left_x(), WinProps::sim_region_upper_left_y());
     glEnd();
 }
 
@@ -97,20 +100,20 @@ struct BoidSim {
     RuleParameters params;
 
     // TODO: pass in frame time
-    void tick(const WindowProps& props)
+    void tick()
     {
         boids.update(1.f / 60.f, params, grid);
-        draw(boids, props);
+        draw(boids);
     }
 };
 
 static BoidSim g_sim;
 
-void tick(const WindowProps& props)
+void tick()
 {
     glClearColor(0.05f, 0.05f, 0.05f, 1.0f);  // Set background color to black and
     glClear(GL_COLOR_BUFFER_BIT);
-    g_sim.tick(props);
+    g_sim.tick();
 }
 
 static void glfw_error_callback(int error, const char* description)
@@ -148,8 +151,7 @@ int main(int, char**)
     if (window == NULL) return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);  // Enable vsync
-
-    WindowProps props(1280, 720);
+    WinProps::update(1280, 720);
 
     // Initialize OpenGL loader
 #if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
@@ -211,18 +213,16 @@ int main(int, char**)
 
         {
             ImGui::SetNextWindowPos(
-                ImVec2(props.config_panel_upper_left_x, props.config_panel_upper_left_y),
+                ImVec2(WinProps::left_panel_upper_left_x(), WinProps::left_panel_upper_left_y()),
                 ImGuiSetCond_Always);
 
-            ImGui::SetNextWindowSize(
-                ImVec2(props.config_panel_width, props.config_panel_height),
-                ImGuiSetCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(WinProps::left_panel_width(), WinProps::left_panel_height()),
+                                     ImGuiSetCond_Always);
 
-            ImGui::Begin(
-                "weboids", 0,
-                ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove |
-                    ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
-                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
+            ImGui::Begin("left_panel", 0,
+                         ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove |
+                             ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                             ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
 
             RuleParameters& params = g_sim.params;
 
@@ -240,12 +240,26 @@ int main(int, char**)
 
             ImGui::Checkbox("##AvgVel_Checkbox", &params.enabled.avg_vel);
             ImGui::SameLine();
-            ImGui::InputFloat("Avg. Velocity", &params.value.avg_vel, 0.01f, 1.0f,
-                              "%.8f");
+            ImGui::InputFloat("Avg. Velocity", &params.value.avg_vel, 0.01f, 1.0f, "%.8f");
 
             ImGui::Checkbox("##Gravity_Checkbox", &params.enabled.gravity);
             ImGui::SameLine();
             ImGui::InputFloat("Gravity", &params.value.gravity, 0.01f, 1.0f, "%.8f");
+
+            ImGui::End();
+
+            ImGui::SetNextWindowPos(
+                ImVec2(WinProps::right_panel_upper_left_x(), WinProps::right_panel_upper_left_y()),
+                ImGuiSetCond_Always);
+
+            ImGui::SetNextWindowSize(
+                ImVec2(WinProps::right_panel_width(), WinProps::right_panel_height()),
+                ImGuiSetCond_Always);
+
+            ImGui::Begin("right_panel", 0,
+                         ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove |
+                             ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                             ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
 
             ImGui::End();
         }
@@ -259,9 +273,8 @@ int main(int, char**)
         glViewport(0, 0, display_w, display_h);
         glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
-        props.update(display_w, display_h);
-        tick(props);
-        draw_debug_layout(props);
+        WinProps::update(display_w, display_h);
+        tick();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwMakeContextCurrent(window);

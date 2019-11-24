@@ -14,12 +14,7 @@ struct PseudoBoid {
     float weight = 0.f;
 
     PseudoBoid(void) = default;
-
-    PseudoBoid(V2 _pos, V2 _vel, float _weight) : pos(_pos), vel(_vel), weight(_weight)
-    {
-        // TODO: deal with this error without failing
-        assert(WindowProps::is_valid(pos));
-    }
+    PseudoBoid(V2 _pos, V2 _vel, float _weight) : pos(_pos), vel(_vel), weight(_weight) {}
 };
 
 class QuadTree {
@@ -82,7 +77,7 @@ class QuadTree {
     static constexpr int s_coarse_grain_node_limit = 3;
 
 public:
-    QuadTree(void) : QuadTree(64) {}
+    QuadTree(void) : QuadTree(128) {}
 
     QuadTree(int nodes_per_axis)
         : m_nodes(nodes_per_axis * nodes_per_axis),

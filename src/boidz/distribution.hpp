@@ -17,17 +17,16 @@ public:
 };
 
 class UniformDistribution : public Distribution {
-    std::uniform_real_distribution<float> m_dist;
-
-    static constexpr float epsilon = 1e-3F;
+    std::uniform_real_distribution<float> m_distX;
+    std::uniform_real_distribution<float> m_distY;
 
 public:
-    UniformDistribution(float low, float high) : Distribution(), m_dist(low, high) {}
+    UniformDistribution(void) = delete;
 
-    UniformDistribution(void)
-        : Distribution(), m_dist(epsilon, WindowProps::coordinate_span - epsilon)
+    UniformDistribution(float x_low, float x_high, float y_low, float y_high)
+        : Distribution(), m_distX(x_low, x_high), m_distY(y_low, y_high)
     {
     }
 
-    V2 sample(void) final { return {m_dist(m_engine), m_dist(m_engine)}; }
+    V2 sample(void) final { return {m_distX(m_engine), m_distY(m_engine)}; }
 };

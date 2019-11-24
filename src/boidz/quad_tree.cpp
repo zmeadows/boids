@@ -1,11 +1,10 @@
 #include "quad_tree.hpp"
 
-// @OPTIMIZE: there is a bit hack for doing this in ~1 cpu cycle
+// @OPTIMIZE: there is a bit hack for doing this in ~1 cpu cycle for square grid with width 256.
 int QuadTree::position_to_node_index(V2 pos) const
 {
-    assert(WindowProps::is_valid(pos));
-    const float node_span =
-        WindowProps::coordinate_span / static_cast<float>(m_nodes_per_axis);
+    assert(WinProps::is_boid_onscreen(pos));
+    const float node_span = WinProps::boid_span / static_cast<float>(m_nodes_per_axis);
     const int node_x = static_cast<int>(std::floor(pos.x / node_span));
     const int node_y = static_cast<int>(std::floor(pos.y / node_span));
     const int node_index = m_nodes_per_axis * node_y + node_x;
@@ -15,6 +14,7 @@ int QuadTree::position_to_node_index(V2 pos) const
     return node_index;
 }
 
+// TODO: Try adding a radius parameter and only include other boids closer than radius
 void QuadTree::get_pseudoboid_neighbors(V2 pos, std::vector<PseudoBoid>& neighbors) const
 {
     neighbors.clear();

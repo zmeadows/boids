@@ -26,8 +26,8 @@ struct RuleParameters {
         bool gravity;
     } enabled;
 
-    float max_force = 1000.f;
-    float max_vel = 250.f;
+    float max_force = 500.f;
+    float max_vel = 200.f;
 };
 
 class BoidCollection {

@@ -2,24 +2,23 @@
 
 static constexpr float wrap_real(float x, float m) { return x - m * std::floor(x / m); }
 
-BoidCollection::BoidCollection(size_t new_boid_count, Distribution& init_pos,
-                               Distribution& init_vel)
+BoidCollection::BoidCollection(size_t new_boid_count, Distribution& init_pos, Distribution& init_vel)
 {
     reset(new_boid_count, init_pos, init_vel);
 }
 
 BoidCollection::BoidCollection(void)
 {
-    UniformDistribution d_pos;
-    UniformDistribution d_vel(0.5f, 100.f / 2.f);
-    reset(1000, d_pos, d_vel);
+    UniformDistribution d_pos(0.25f * WinProps::boid_span, 0.75f * WinProps::boid_span,
+                              0.25f * WinProps::boid_span, 0.75f * WinProps::boid_span);
+    UniformDistribution d_vel(0.1f, 10.f, 0.1f, 10.f);
+    reset(500, d_pos, d_vel);
 }
 
-void BoidCollection::reset(size_t new_boid_count, Distribution& init_pos,
-                           Distribution& init_vel)
+void BoidCollection::reset(size_t new_boid_count, Distribution& init_pos, Distribution& init_vel)
 {
-    for (std::vector<V2>* vec : {&m_pos, &m_vel, &m_delta_avg_vel, &m_delta_confine,
-                                 &m_delta_density, &m_delta_center_of_mass}) {
+    for (std::vector<V2>* vec : {&m_pos, &m_vel, &m_delta_avg_vel, &m_delta_confine, &m_delta_density,
+                                 &m_delta_center_of_mass}) {
         assert(vec->size() == m_count);
 
         if (new_boid_count < m_count) {
@@ -102,10 +101,8 @@ void BoidCollection::update(float dt, const RuleParameters& params, QuadTree& gr
 
             const float cp = params.value.confine;
 
-            const float confine_x =
-                1.f / (cp * std::pow(dx1, 2.f)) - 1.f / (cp * std::pow(dx2, 2.f));
-            const float confine_y =
-                1.f / (cp * std::pow(dy1, 2.f)) - 1.f / (cp * std::pow(dy2, 2.f));
+            const float confine_x = 1.f / (cp * std::pow(dx1, 2.f)) - 1.f / (cp * std::pow(dx2, 2.f));
+            const float confine_y = 1.f / (cp * std::pow(dy1, 2.f)) - 1.f / (cp * std::pow(dy2, 2.f));
 
             m_delta_confine[id] = {confine_x, confine_y};
         }
@@ -121,6 +118,12 @@ void BoidCollection::update(float dt, const RuleParameters& params, QuadTree& gr
         if (params.enabled.com) dv += m_delta_center_of_mass[id];
         if (params.enabled.gravity) dv.y -= params.value.gravity * dt;
 
+        static int n = 0;
+        n++;
+        if (n % 500 == 0) {
+            std::cout << params.enabled.avg_vel << " :: " << dv << std::endl;
+        }
+
         // clamp the force vector magnitude to the user-specified maximum force.
         const float dv_mag = dv.magnitude();
         if (dv_mag > params.max_force) {
@@ -128,6 +131,7 @@ void BoidCollection::update(float dt, const RuleParameters& params, QuadTree& gr
         }
 
         V2& vel = m_vel[id];
+        vel += dv;
         vel = clamp(vel, params.max_vel);
 
         V2& pos = m_pos[id];
