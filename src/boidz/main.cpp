@@ -5,6 +5,9 @@
 
 #include <stdio.h>
 
+#include <chrono>
+using namespace std::chrono;
+
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -102,7 +105,11 @@ struct BoidSim {
     // TODO: pass in frame time
     void tick()
     {
+        auto start_time = high_resolution_clock::now();
         boids.update(1.f / 60.f, params, grid);
+        auto end_time = high_resolution_clock::now();
+        auto dur = duration_cast<duration<double>>(end_time - start_time).count();
+        std::cout << dur << std::endl;
         draw(boids);
     }
 };
