@@ -12,7 +12,7 @@ BoidCollection::BoidCollection(void)
     UniformDistribution d_pos(0.25f * WinProps::boid_span, 0.75f * WinProps::boid_span,
                               0.25f * WinProps::boid_span, 0.75f * WinProps::boid_span);
     UniformDistribution d_vel(-50.f, 50.f, -50.f, 50.f);
-    reset(20000, d_pos, d_vel);
+    reset(60000, d_pos, d_vel);
 }
 
 void BoidCollection::reset(size_t new_boid_count, Distribution& init_pos, Distribution& init_vel)
@@ -85,13 +85,15 @@ void BoidCollection::update_thread(float dt, const RuleParameters& params, const
         V2 dens_accum = V2::null();
 
         for (const PseudoBoid& pb : neighbors) {
-            pos_sum += pb.weight * pb.pos;
-            vel_sum += pb.weight * pb.vel;
-            weight_sum += pb.weight;
-
             const float separation = distance_sq(pos, pb.pos);
-            if (separation > 1e-7) {
-                dens_accum += pb.weight / separation * (pos - pb.pos);
+            if (separation < grid.effect_radius_squared()) {
+                pos_sum += pb.weight * pb.pos;
+                vel_sum += pb.weight * pb.vel;
+                weight_sum += pb.weight;
+
+                if (separation > 1e-7) {
+                    dens_accum += pb.weight / separation * (pos - pb.pos);
+                }
             }
         }
 

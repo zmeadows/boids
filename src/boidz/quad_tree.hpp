@@ -74,10 +74,10 @@ class QuadTree {
     // in 'fine grain' cells we treat each boid as a separate PseudoBoid neighbor
     static constexpr int s_fine_grain_node_limit = 1;
     // in 'coarse grain' cells we group together all boids into a single PseudoBoids
-    static constexpr int s_coarse_grain_node_limit = 3;
+    static constexpr int s_coarse_grain_node_limit = 2;
 
 public:
-    QuadTree(void) : QuadTree(128) {}
+    QuadTree(void) : QuadTree(256) {}
 
     QuadTree(int nodes_per_axis)
         : m_nodes(nodes_per_axis * nodes_per_axis),
@@ -90,4 +90,9 @@ public:
     // TODO: just pass vector<V2>'s
     void insert(const BoidCollection& boids);
     void get_pseudoboid_neighbors(V2 pos, std::vector<PseudoBoid>& neighbors) const;
+
+    float effect_radius_squared(void) const
+    {
+        return 4.0 * std::pow(m_nodes_per_axis / WinProps::boid_span, 2.f);
+    }
 };
