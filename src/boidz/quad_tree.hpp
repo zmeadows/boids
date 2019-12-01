@@ -72,12 +72,12 @@ class QuadTree {
     inline Node& position_to_node(V2 pos) { return m_nodes[position_to_node_index(pos)]; }
 
     // in 'fine grain' cells we treat each boid as a separate PseudoBoid neighbor
-    static constexpr int s_fine_grain_node_limit = 1;
+    static constexpr int s_fine_grain_node_limit = 0;
     // in 'coarse grain' cells we group together all boids into a single PseudoBoids
-    static constexpr int s_coarse_grain_node_limit = 2;
+    static constexpr int s_coarse_grain_node_limit = 1;
 
 public:
-    QuadTree(void) : QuadTree(256) {}
+    QuadTree(void) : QuadTree(512) {}
 
     QuadTree(int nodes_per_axis)
         : m_nodes(nodes_per_axis * nodes_per_axis),

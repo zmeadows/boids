@@ -12,7 +12,7 @@ BoidCollection::BoidCollection(void)
     UniformDistribution d_pos(0.25f * WinProps::boid_span, 0.75f * WinProps::boid_span,
                               0.25f * WinProps::boid_span, 0.75f * WinProps::boid_span);
     UniformDistribution d_vel(-50.f, 50.f, -50.f, 50.f);
-    reset(60000, d_pos, d_vel);
+    reset(30000, d_pos, d_vel);
 }
 
 void BoidCollection::reset(size_t new_boid_count, Distribution& init_pos, Distribution& init_vel)
@@ -67,8 +67,8 @@ static std::vector<std::pair<size_t, size_t>> split_range(size_t thread_count, s
     return result;
 }
 
-void BoidCollection::update_thread(float dt, const RuleParameters& params, const QuadTree& grid,
-                                   size_t low_index, size_t high_index)
+void BoidCollection::update_thread(const Rules& params, const QuadTree& grid, size_t low_index,
+                                   size_t high_index)
 {
     static thread_local std::vector<PseudoBoid> neighbors;
 
@@ -97,21 +97,24 @@ void BoidCollection::update_thread(float dt, const RuleParameters& params, const
             }
         }
 
+        const auto toggles = params.toggles;
+        const auto values = params.values;
+
         if (weight_sum > 0.f) {
             const float inverted_weight_sum = 1.f / weight_sum;
             const V2 avg_vel = vel_sum * inverted_weight_sum;
             const V2 avg_pos = pos_sum * inverted_weight_sum;
 
-            if (params.enabled.avg_vel) {
-                m_delta_avg_vel[id] = params.value.avg_vel * avg_vel;
+            if (toggles[RT_AVERAGE_VELOCITY]) {
+                m_delta_avg_vel[id] = values[RT_AVERAGE_VELOCITY] * avg_vel;
             }
 
-            if (params.enabled.density) {
-                m_delta_density[id] = params.value.density * dens_accum;
+            if (toggles[RT_DENSITY]) {
+                m_delta_density[id] = values[RT_DENSITY] * dens_accum;
             }
 
-            if (params.enabled.com) {
-                m_delta_center_of_mass[id] = params.value.com * (avg_pos - pos);
+            if (toggles[RT_CENTER_OF_MASS]) {
+                m_delta_center_of_mass[id] = values[RT_CENTER_OF_MASS] * (avg_pos - pos);
             }
         }
         else {
@@ -120,12 +123,12 @@ void BoidCollection::update_thread(float dt, const RuleParameters& params, const
             m_delta_center_of_mass[id] = V2::null();
         }
 
-        if (params.enabled.confine) {
+        if (toggles[RT_CONFINE]) {
             // @FIXME: Use smaller delta time increments when close to edge
 
             const float x = std::min(WinProps::boid_span - 1e-3F, std::max(1e-3F, pos.x));
             const float y = std::min(WinProps::boid_span - 1e-3F, std::max(1e-3F, pos.y));
-            const float cp = params.value.confine;
+            const float cp = values[RT_CONFINE];
             const float s = WinProps::boid_span;
 
             const float confine_x = 1e3 * cp * (1.f / std::pow(x, 4.f) - 1.f / std::pow(x - s, 4.f));
@@ -136,7 +139,7 @@ void BoidCollection::update_thread(float dt, const RuleParameters& params, const
     }
 }
 
-void BoidCollection::update(float dt, const RuleParameters& params, QuadTree& grid)
+void BoidCollection::update(float dt, const Rules& params, QuadTree& grid)
 {
     grid.insert(*this);
 
@@ -146,38 +149,54 @@ void BoidCollection::update(float dt, const RuleParameters& params, QuadTree& gr
     results.reserve(boid_ranges.size());
 
     for (const auto& r : boid_ranges) {
-        results.emplace_back(m_pool.enqueue(
-            [&](void) -> void { this->update_thread(dt, params, grid, r.first, r.second); }));
+        results.emplace_back(
+            m_pool.enqueue([&](void) -> void { this->update_thread(params, grid, r.first, r.second); }));
     }
 
     for (auto&& r : results) {
         r.get();
     }
 
+    const auto toggles = params.toggles;
+    const auto values = params.values;
+
     for (size_t id = 0; id < m_count; id++) {
         V2 dv = V2::null();
 
         // apply only the rules that have been turned on
-        if (params.enabled.avg_vel) dv += m_delta_avg_vel[id];
-        if (params.enabled.confine) dv += m_delta_confine[id];
-        if (params.enabled.density) dv += m_delta_density[id];
-        if (params.enabled.com) dv += m_delta_center_of_mass[id];
-        if (params.enabled.gravity) dv.y -= params.value.gravity * dt;
+        if (toggles[RT_AVERAGE_VELOCITY]) dv += m_delta_avg_vel[id];
+        if (toggles[RT_CONFINE]) dv += m_delta_confine[id];
+        if (toggles[RT_DENSITY]) dv += m_delta_density[id];
+        if (toggles[RT_CENTER_OF_MASS]) dv += m_delta_center_of_mass[id];
+        if (toggles[RT_GRAVITY]) dv.y += values[RT_GRAVITY] * dt;
 
-        // clamp the force vector magnitude to the user-specified maximum force.
-        const float dv_mag = dv.magnitude();
-        if (dv_mag > params.max_force) {
-            dv *= params.max_force / dv_mag;
+        {
+            float max_force = 100.f;
+
+            if (toggles[RT_MAX_FORCE] && values[RT_MAX_FORCE] >= 0.f && values[RT_MAX_FORCE] < 300.f) {
+                max_force = values[RT_MAX_FORCE];
+            }
+
+            const float force_magnitude = dv.magnitude();
+
+            if (force_magnitude > max_force) {
+                dv *= max_force / force_magnitude;
+            }
         }
 
         V2& vel = m_vel[id];
         vel += dv;
-        vel = clamp(vel, params.max_vel);
+
+        if (toggles[RT_MAX_VELOCITY] && values[RT_MAX_VELOCITY] >= 0.f &&
+            values[RT_MAX_VELOCITY] < 500.f) {
+        }
+        vel = clamp(vel, values[RT_MAX_VELOCITY]);
 
         V2& pos = m_pos[id];
         pos = pos + dt * vel;
 
         if (!WinProps::is_boid_onscreen(pos)) {
+            // @TODO: use random position?
             pos = {10.f, 10.f};
             vel = {10.f, 10.f};
         }

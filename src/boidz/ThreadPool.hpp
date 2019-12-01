@@ -26,17 +26,17 @@ freely, subject to the following restrictions:
 #pragma once
 
 // containers
-#include <vector>
 #include <queue>
+#include <vector>
 // threading
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <atomic>
+#include <condition_variable>
 #include <future>
+#include <mutex>
+#include <thread>
 // utility wrappers
-#include <memory>
 #include <functional>
+#include <memory>
 // exceptions
 #include <stdexcept>
 
@@ -47,28 +47,23 @@ public:
     ThreadPool(size_t threads_n = std::thread::hardware_concurrency()) : stop(false)
     {
         this->workers.reserve(threads_n);
-        for(; threads_n; --threads_n)
-            this->workers.emplace_back(
-                [this]
-                {
-                    while(true)
+        for (; threads_n; --threads_n)
+            this->workers.emplace_back([this] {
+                while (true) {
+                    std::function<void()> task;
+
                     {
-                        std::function<void()> task;
-
-                        {
-                            std::unique_lock<std::mutex> lock(this->queue_mutex);
-                            this->condition.wait(lock,
-                                [this]{ return this->stop || !this->tasks.empty(); });
-                            if(this->stop && this->tasks.empty())
-                                return;
-                            task = std::move(this->tasks.front());
-                            this->tasks.pop();
-                        }
-
-                        task();
+                        std::unique_lock<std::mutex> lock(this->queue_mutex);
+                        this->condition.wait(lock,
+                                             [this] { return this->stop || !this->tasks.empty(); });
+                        if (this->stop && this->tasks.empty()) return;
+                        task = std::move(this->tasks.front());
+                        this->tasks.pop();
                     }
+
+                    task();
                 }
-            );
+            });
     }
 
     // deleted copy&move ctors&assignments
@@ -80,18 +75,17 @@ public:
     size_t nthreads(void) const { return workers.size(); }
 
     // add new work item to the pool
-    template<class F, class... Args>
+    template <class F, class... Args>
     std::future<typename std::result_of<F(Args...)>::type> enqueue(F&& f, Args&&... args)
     {
-        using packaged_task_t = std::packaged_task<typename std::result_of<F(Args...)>::type ()>;
+        using packaged_task_t = std::packaged_task<typename std::result_of<F(Args...)>::type()>;
 
-        std::shared_ptr<packaged_task_t> task(new packaged_task_t(
-                std::bind(std::forward<F>(f), std::forward<Args>(args)...)
-            ));
+        std::shared_ptr<packaged_task_t> task(
+            new packaged_task_t(std::bind(std::forward<F>(f), std::forward<Args>(args)...)));
         auto res = task->get_future();
         {
             std::unique_lock<std::mutex> lock(this->queue_mutex);
-            this->tasks.emplace([task](){ (*task)(); });
+            this->tasks.emplace([task]() { (*task)(); });
         }
         this->condition.notify_one();
         return res;
@@ -101,14 +95,14 @@ public:
     {
         this->stop = true;
         this->condition.notify_all();
-        for(std::thread& worker : this->workers)
-            worker.join();
+        for (std::thread& worker : this->workers) worker.join();
     }
+
 private:
     // need to keep track of threads so we can join them
-    std::vector< std::thread > workers;
+    std::vector<std::thread> workers;
     // the task queue
-    std::queue< std::function<void()> > tasks;
+    std::queue<std::function<void()> > tasks;
 
     // synchronization
     std::mutex queue_mutex;

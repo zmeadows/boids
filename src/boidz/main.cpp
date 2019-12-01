@@ -41,12 +41,44 @@ using namespace std::chrono;
 #endif
 
 #include "boid_collection.hpp"
+#include "frame_graph.hpp"
 #include "props.hpp"
 #include "quad_tree.hpp"
 #include "v2.hpp"
 
-void draw(const BoidCollection& boids)
+struct Color {
+    float r = 0.f;
+    float g = 0.f;
+    float b = 0.f;
+
+    Color(void) = default;
+    Color(float r_, float g_, float b_) : r(r_), g(g_), b(b_) {}
+};
+
+Color add_color(float blend_factor, const Color& c1, const Color& c2)
 {
+    Color result;
+
+    blend_factor = std::max(0.f, std::min(blend_factor, 1.f));
+
+    result.r = blend_factor * c1.r + (1.f - blend_factor) * c2.r;
+    result.g = blend_factor * c1.g + (1.f - blend_factor) * c2.g;
+    result.b = blend_factor * c1.b + (1.f - blend_factor) * c2.b;
+
+    const float mag =
+        std::sqrt(std::pow(result.r, 2.f) + std::pow(result.g, 2.f) + std::pow(result.b, 2.f));
+
+    result.r /= mag;
+    result.g /= mag;
+    result.b /= mag;
+
+    return result;
+}
+
+float draw(const BoidCollection& boids)
+{
+    auto start_time = high_resolution_clock::now();
+
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     // TODO: use transform here instead of transforming coordinates ourself?
@@ -57,10 +89,20 @@ void draw(const BoidCollection& boids)
     glBegin(GL_POINTS);
     for (const V2& pos : positions) {
         const V2 wpos = WinProps::boid_to_window_coordinates(pos);
-        glColor3f(1.f, 1.f, 1.f);
+
+        static constexpr V2 mid_point = {WinProps::boid_span / 2.f, WinProps::boid_span / 2.f};
+        const float dr = (pos - mid_point).magnitude();
+
+        const Color draw_color =
+            add_color(dr / WinProps::boid_span, Color(1.f, 0.f, 0.f), Color(0.f, 1.f, 0.f));
+
+        glColor3f(draw_color.r, draw_color.g, draw_color.b);
         glVertex2f(wpos.x, wpos.y);
     }
     glEnd();
+
+    auto end_time = high_resolution_clock::now();
+    return duration_cast<duration<float>>(end_time - start_time).count();
 }
 
 void draw_debug_layout(void)
@@ -100,27 +142,24 @@ void draw_debug_layout(void)
 struct BoidSim {
     BoidCollection boids;
     QuadTree grid;
-    RuleParameters params;
+    Rules params;
 
-    // TODO: pass in frame time
-    void tick()
+    float tick()
     {
         auto start_time = high_resolution_clock::now();
         boids.update(1.f / 60.f, params, grid);
         auto end_time = high_resolution_clock::now();
-        auto dur = duration_cast<duration<double>>(end_time - start_time).count();
-        std::cout << dur << std::endl;
-        draw(boids);
+        return duration_cast<duration<float>>(end_time - start_time).count();
     }
 };
 
 static BoidSim g_sim;
 
-void tick()
+float tick()
 {
     glClearColor(0.05f, 0.05f, 0.05f, 1.0f);  // Set background color to black and
     glClear(GL_COLOR_BUFFER_BIT);
-    g_sim.tick();
+    return g_sim.tick();
 }
 
 static void glfw_error_callback(int error, const char* description)
@@ -201,6 +240,9 @@ int main(int, char**)
     ImGui::GetStyle().PopupRounding = 0.0f;
     ImGui::GetStyle().ScrollbarRounding = 0.0f;
 
+    static TimeGraph sim_time_graph;
+    static TimeGraph draw_time_graph;
+
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -231,27 +273,23 @@ int main(int, char**)
                              ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
                              ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
 
-            RuleParameters& params = g_sim.params;
+            {  // display the user-editable toggles/parameter inputs for each rule type
+                static char checkbox_name_buffer[256];
+                static char input_name_buffer[256];
 
-            ImGui::Checkbox("##CoM_Checkbox", &params.enabled.com);
-            ImGui::SameLine();
-            ImGui::InputFloat("Center Of Mass", &params.value.com, 0.01f, 1.0f, "%.8f");
+                auto& toggles = g_sim.params.toggles;
+                auto& values = g_sim.params.values;
 
-            ImGui::Checkbox("##Density_Checkbox", &params.enabled.density);
-            ImGui::SameLine();
-            ImGui::InputFloat("Density", &params.value.density, 0.01f, 1.0f, "%.8f");
-
-            ImGui::Checkbox("##Confine_Checkbox", &params.enabled.confine);
-            ImGui::SameLine();
-            ImGui::InputFloat("Confine", &params.value.confine, 0.01f, 1.0f, "%.8f");
-
-            ImGui::Checkbox("##AvgVel_Checkbox", &params.enabled.avg_vel);
-            ImGui::SameLine();
-            ImGui::InputFloat("Avg. Velocity", &params.value.avg_vel, 0.01f, 1.0f, "%.8f");
-
-            ImGui::Checkbox("##Gravity_Checkbox", &params.enabled.gravity);
-            ImGui::SameLine();
-            ImGui::InputFloat("Gravity", &params.value.gravity, 0.01f, 1.0f, "%.8f");
+                for (int rt = 0; rt < RT_COUNT; rt++) {
+                    sprintf(checkbox_name_buffer, "##%s_CheckBox", RULE_NAMES_NOSPACE[rt]);
+                    sprintf(input_name_buffer, "##%s_InputFloat", RULE_NAMES_NOSPACE[rt]);
+                    ImGui::Text("%s", RULE_NAMES[rt]);
+                    ImGui::Checkbox(checkbox_name_buffer, &toggles[rt]);
+                    ImGui::SameLine();
+                    ImGui::InputFloat(input_name_buffer, &values[rt], 0.01f, 1.0f, "%.8f");
+                    ImGui::Separator();
+                }
+            }
 
             ImGui::End();
 
@@ -268,6 +306,9 @@ int main(int, char**)
                              ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
                              ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
 
+            sim_time_graph.draw("Sim. Time");
+            draw_time_graph.draw("Draw Time");
+
             ImGui::End();
         }
 
@@ -281,7 +322,10 @@ int main(int, char**)
         glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         WinProps::update(display_w, display_h);
-        tick();
+        const float frame_sim_time = tick();
+        sim_time_graph.attach_new_time_delta(frame_sim_time);
+        const float frame_draw_time = draw(g_sim.boids);
+        draw_time_graph.attach_new_time_delta(frame_draw_time);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwMakeContextCurrent(window);
