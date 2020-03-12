@@ -77,7 +77,7 @@ class QuadTree {
     static constexpr int s_coarse_grain_node_limit = 1;
 
 public:
-    QuadTree(void) : QuadTree(512) {}
+    QuadTree(void) : QuadTree(128) {}
 
     QuadTree(int nodes_per_axis)
         : m_nodes(nodes_per_axis * nodes_per_axis),

@@ -31,7 +31,6 @@ public:
 
     void draw(const char* label)
     {
-        // TODO: add overlay text that displays average value
         if (m_cycled_once) {
             char buffer[256];
             sprintf(buffer, "%.*f", 6, m_average_frame_time);

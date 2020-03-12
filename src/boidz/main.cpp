@@ -68,9 +68,11 @@ Color add_color(float blend_factor, const Color& c1, const Color& c2)
     const float mag =
         std::sqrt(std::pow(result.r, 2.f) + std::pow(result.g, 2.f) + std::pow(result.b, 2.f));
 
-    result.r /= mag;
-    result.g /= mag;
-    result.b /= mag;
+    if (mag > 1.f) {
+        result.r /= mag;
+        result.g /= mag;
+        result.b /= mag;
+    }
 
     return result;
 }
@@ -94,7 +96,7 @@ float draw(const BoidCollection& boids)
         const float dr = (pos - mid_point).magnitude();
 
         const Color draw_color =
-            add_color(dr / WinProps::boid_span, Color(1.f, 0.f, 0.f), Color(0.f, 1.f, 0.f));
+            add_color(dr / WinProps::boid_span, Color(1.f, 0.f, 3.f), Color(2.f, 1.f, 0.f));
 
         glColor3f(draw_color.r, draw_color.g, draw_color.b);
         glVertex2f(wpos.x, wpos.y);
